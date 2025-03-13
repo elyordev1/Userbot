@@ -1,0 +1,152 @@
+
+msgid ""
+msgstr "" 
+
+"Project-Id-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: uz\n"
+
+msgid "welcome_new"
+msgstr "👋 Salom! Botdan foydalanish uchun ismingizni kiriting:"
+
+msgid "welcome_back"
+msgstr "✅ Siz allaqachon ro'yxatdan o'tgansiz! Botdan foydalanishni boshlashingiz mumkin."
+
+msgid "choose_language"
+msgstr "🌐 Tilni tanlang:"
+
+msgid "language_changed"
+msgstr "✅ Til o'zbekchaga muvaffaqiyatli o'zgartirildi!"
+
+msgid "help_message"
+msgstr "📌 Mavjud buyruqlar:\n\n1️⃣ /help - Buyruqlar haqida ma'lumot\n2️⃣ /get - Guruhlar ro'yxati\n3️⃣ /sendmessage - Xabarni saqlash\n4️⃣ /show - Saqlangan xabarni ko'rish\n5️⃣ /delete - Saqlangan xabarni o'chirish\n6️⃣ /search - Guruhlardan qidirish\n7️⃣ /stop - Hisobni o'chirish\n8️⃣ /admin - Admin bilan bog'lanish"
+
+msgid "send_phonenumber"
+msgstr "📱 Telefon raqamni yuborish"
+
+msgid "deleted_successfully"
+msgstr "✅ Hisobingiz o‘chirildi. Bot xizmatlarini qayta ishlatish uchun /start bosing."
+
+msgid "reregister"
+msgstr "⚠️ Siz botni akkauntingizdan chiqarib yuborgansiz. Qayta ro‘yxatdan o‘ting."
+
+msgid "togri_tartib"
+msgstr "Iltimos, ro'yxatdan o'tish tartibini to'g'ri bajaring."
+
+msgid "sending_vercode"
+msgstr "📱 Tasdiqlash kodi yuborilmoqda..."
+
+msgid "write_vercode
+msgstr "✅ Tasdiqlash kodini kiriting (format: 3.4.5.6.7):"
+
+msgid "notogri_format"
+msgstr "❌ Noto'g'ri format. Iltimos, kodni 3.4.5.6.7 formatida kiriting."
+
+msgid "two_step_pass"
+msgstr "🔒 Ikki bosqichli parol talab qilinmoqda. Iltimos, parolni kiriting:"
+
+msgid "false_msg"
+msgstr "❌ Xabar yuborishda xatolik yuz berdi."
+
+msgid "followed_groups"
+msgstr "📋 Obuna bo'lgan guruhlar ro'yxati:\n\n"
+
+msgid "no_group"
+msgstr "❌ Siz hech qanday guruhga obuna emassiz."
+
+msgid "not_register"
+msgstr "❌ Siz ro'yxatdan o'tmagansiz."
+
+msgid "do_reply"
+msgstr "❌ Iltimos, saqlash uchun xabarni reply qiling."
+
+msgid "saved_successfully"
+msgstr "✅ Xabar muvaffaqiyatli saqlandi."
+
+msgid "started_sending"
+msgstr "🚀 Xabar yuborish boshlandi..."
+
+msgid "netu_msg"
+msgstr "❌ Hech qanday xabar saqlanmagan."
+
+msgid "deleted_msg"
+msgstr "🗑️ Xabar muvaffaqiyatli o'chirildi."
+
+msgid "only_for_admin"
+msgstr "⛔ Bu buyruq faqat admin uchun."
+
+msgid "admin_msg"
+msgstr "👋 Hurmatli foydalanuvchi, agar sizda savol yoki taklif bo‘lsa, shu yerga yozing. Adminlar tez orada javob berishadi! 😊 Aloqaga chiqishingiz mumkin @eradevv"
+
+msgid "in_searching_process"
+msgstr "⏳ Siz hozir qidiruv jarayonidasiz. Jarayon tugagandan keyin hisob o‘chiriladi."
+
+msgid "deleted_account"
+msgstr "Hisobingiz o'chirildi! Qayta ro'yhatdan o'tish uchun /start"
+
+msgid "cancel"
+msgstr "❌ Bekor qilish"
+
+msgid "two_words"
+msgstr "🔍 Ikkita qidirilishi kerak bo'lgan so'zni kiriting (probel bilan ajratib).\nMasalan: salom dunyo"
+
+msgid "probel"
+msgstr "❌ Iltimos, aynan 2 ta so'z kiriting (probel bilan ajratib)."
+
+msgid "incorrect"
+msgstr "❌ Noto'g'ri raqam kiritildi."
+
+msgid "searching"
+msgstr "🔍 Qidirilmoqda..."
+
+msgid "canceled_search"
+msgstr "❌ Qidiruv bekor qilindi."
+
+msgid "finished_search"
+msgstr "✅ Qidiruv tugadi!"
+
+msgid "incorrect_format"
+msgstr "❌ Noto'g'ri format. Masalan: 1, 3, 5"
+
+msgid "bekor"
+msgstr "⚠️ Siz allaqachon qidiruv jarayonidasiz. Bekor qilish uchun ❌ Bekor qilish tugmasini bosing."
+
+msgid "not_in_search"
+msgstr "⚠️ Hozirda qidiruv jarayonida emassiz."
+
+msgid "all_sent"
+msgstr "✅ Barcha xabarlar yuborildi."
+
+msgid "sending_status"
+msgstr "📤 Yuborildi: {idx}/{total_groups} - {group_title}"
+
+msgid "registration_success"
+msgstr "✅ Ro‘yxatdan o‘tish muvaffaqiyatli yakunlandi!"
+
+msgid "flood_wait"
+msgstr "⏳ FloodWait: {seconds} soniya kuting..."
+
+msgid "sending_error"
+msgstr "❌ {group_title} uchun xabar yuborishda xatolik."
+
+msgid "message_saved"
+msgstr "✉️ Xabar saqlandi:\n- Xabar ID: `{message_id}`\n- Guruh ID: `{group_id}`"
+
+msgid "group_search_prompt"
+msgstr "📋 Qaysi guruhlardan qidirish kerak? Guruh raqamlarini vergul bilan ajratib yozing.\nMasalan: 1, 3, 5\n\n{groups_list}"
+
+msgid "message_list_item"
+msgstr "{i}. {short_msg}...\n🔗 [Xabarni ko‘rish]({message_link})\n\n"
+
+msgid "error_message"
+msgstr "❌ Xatolik: {group_title}, {error_detail}"
+
+msgid "ask_phone"
+msgstr "👋 Salom! Ro'yxatdan o'tish uchun telefon raqamingizni yuboring:"
+
+
+
+
+
+
+

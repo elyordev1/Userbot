@@ -1,0 +1,14 @@
+# Bot sozlamalari
+.env
+
+# Python kesh va kompilyatsiya fayllari
+__pycache__/
+*.pyc
+*.pyo
+
+# SQL ma'lumotlar bazasi
+users.db
+
+# Log va vaqtinchalik fayllar
+*.log
+*.tmp
