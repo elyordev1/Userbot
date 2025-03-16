@@ -5,7 +5,7 @@ from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError, FloodWaitError, UserDeactivatedBanError
 from translations import i18n
-from telethon.errors import FloodWaitError, UserDeactivatedBandError
+from telethon.errors import FloodWaitError, UserDeactivatedBanError
 from config import API_TOKEN, TELETHON_API_ID, TELETHON_API_HASH, BOT_SESSION_STRING, ADMIN_ID, LANGUAGES
 from dp_helpers import get_daily_users, get_db_connection, get_monthly_users, get_total_users
 from aiogram.dispatcher import Dispatcher
@@ -222,7 +222,8 @@ async def safe_send_message(chat_id, text):
 
 
 async def get_telethon_client(user_id):
-    """Telethon clientni olish: agar faol klient mavjud bo'lsa, uni qaytaramiz, aks holda, bazadan yangidan ochamiz."""
+    """Telethon clientni olish: agar faol klient mavjud bo'lsa, uni qaytaramiz,
+       aks holda, bazadan session_string olib, connect() orqali tekshiramiz."""
     if user_id in active_clients:
         return active_clients[user_id]
 
@@ -234,11 +235,22 @@ async def get_telethon_client(user_id):
     if row:
         session_string = row[0]
         client = TelegramClient(StringSession(session_string), TELETHON_API_ID, TELETHON_API_HASH)
-        await client.start()
+
+        # interaktiv rejimga tushmaslik uchun start() o‘rniga connect() dan foydalanamiz
+        await client.connect()
+
+        # endi tekshiramiz, agar foydalanuvchi authorized bo‘lmasa, None qaytaramiz
+        if not await client.is_user_authorized():
+            await client.disconnect()
+            return None
+
+        # sessiya yaroqli bo‘lsa, clientni saqlaymiz
         active_clients[user_id] = client
         return client
+
+    # Umuman session_string topilmadi
     return None
-# END: start_telethon_client
+
 
 def get_user_name(user_id):
     cursor.execute("SELECT name FROM users WHERE user_id = ?", (user_id,))
@@ -264,8 +276,7 @@ async def delete_user_account(user_id, message=None):
             print(f"Foydalanuvchini chiqish paytida xatolik: {e}")
         finally:
             active_clients.pop(user_id, None)
-    else:
-        print(f"Foydalanuvchi {user_id} uchun faol klient topilmadi.")
+
 
     # Qidiruv ro'yxatidan va vaqtinchalik ma'lumotlardan tozalaymiz
     searching_users.pop(user_id, None)  # Agar user_id mavjud bo‘lsa, olib tashlaydi, bo‘lmasa hech narsa qilmaydi
@@ -274,7 +285,8 @@ async def delete_user_account(user_id, message=None):
 
     if message:
         user_language = get_user_language(message.from_user.id)  
-        text = i18n.get_text("deleted_successfully", user_language)
+        # text = i18n.get_text("deleted_successfully", user_language)
+        text = "Hisobingiz o‘chirildi. Bot xizmatlarini qayta ishlatish uchun /start bosing." if temp_data[user_id]["language"] == "uz" else "Ваш аккаунт удален. Чтобы снова использовать сервисы бота, нажмите /start."
         await message.reply(text, reply_markup=types.ReplyKeyboardRemove())
 # END: delete_user_account
 
@@ -356,9 +368,9 @@ async def process_phone_number(message: types.Message):
                 await message.answer("❌ Bot Telegramga ulanganiga ishonch hosil qiling!")
                 return
             if not await client.is_user_authorized():
-                print("🚀  kod yuboriladi.")
-                sent = await client.send_code_request(phone_number)
-                print(f"✅ Kod yuborildi: {sent}")
+                # print("🚀  kod yuboriladi.")
+                await client.send_code_request(phone_number)
+                # print(f"✅ Kod yuborildi: {sent}")
 
                 temp_data[user_id] = {
                     "state": "awaiting_code",
@@ -375,7 +387,7 @@ async def process_phone_number(message: types.Message):
                 await message.answer("⚠️ Siz allaqachon tizimga kirdingiz.")
         except Exception as e:
             logging.error(f"❌ Xatolik kod yuborishda: {e}")
-            print(f"❌ Xatolik: {e}")
+            # print(f"❌ Xatolik: {e}")
             await message.answer("❌ Kod yuborishda muammo yuz berdi. Iltimos, qayta urinib ko‘ring.")
 
     else:
@@ -530,22 +542,21 @@ async def sendmessage(message: types.Message):
             for idx, group in enumerate(groups, start=1):
                 try:
                     await client.send_message(group.id, reply_message.text)  # Faqat matn yuboriladi
-                    progress_text = i18n.get_text(
-                        "message_sent",
-                        user_language,
+                    progress_text = i18n.get_text("sending_status", user_language).format(
                         idx=idx,
                         total_groups=len(groups),
                         group_title=group.title
                     )
+
                     await progress_message.edit_text(progress_text)
                     await asyncio.sleep(send_delay)
                 except FloodWaitError as e:
-                    flood_text = i18n.get_text("flood_wait", user_language, seconds=e.seconds)
+                    flood_text = i18n.get_text("flood_wait", user_language).format(seconds=e.seconds)
                     await message.answer(flood_text)
                     await asyncio.sleep(e.seconds)
                 except Exception as e:
                     logging.error(f"Xatolik {group.title} uchun: {e}")
-                    error_text = i18n.get_text("sending_error", user_language, group_title=group.title)
+                    error_text = i18n.get_text("sending_error", user_language).format(group_title=group.title)
                     await message.answer(error_text)
 
             # Xabar tugagach, uni o‘chirish
@@ -682,31 +693,73 @@ async def finish_search_for_user(user_id):
 async def start_command(message: types.Message):
     user_id = message.from_user.id
 
-    # Sessiyani tekshirish
-    if not await check_user_session_valid(user_id):
-        await message.answer("Sizning sessiyangiz tugagan yoki bloklangansiz. Qayta ro‘yxatdan o‘ting.")
-        return
-
-    # Agar foydalanuvchi qidiruv jarayonida bo'lsa, tozalash
-    searching_users.pop(user_id, None)
-    temp_data.pop(user_id, None)
-
+    # Avval DB dan foydalanuvchi ma'lumotlarini olamiz
     with get_db_connection() as db:
         cursor = db.cursor()
         cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
         user = cursor.fetchone()
 
-
-    if user and user[2]:  # Agar foydalanuvchi bazada bo'lsa
-        user_language = get_user_language(user_id)
-        text = i18n.get_text("welcome_back", user_language)
-        await message.answer(text)
-        await help_command(message)
+    # Agar foydalanuvchi ro'yxatda bo'lsa va session mavjud bo'lsa
+    if user:
+        # Agar session yaroqsiz bo'lsa
+        if not await check_user_session_valid(user_id):
+            # Yaroqsiz sessiyani yangilaymiz yoki o'chirib qo'yamiz
+            with get_db_connection() as db:
+                cursor = db.cursor()
+                cursor.execute("UPDATE users SET session_string = NULL WHERE user_id = ?", (user_id,))
+                db.commit()
+            # Ro'yxatdan o'tish jarayonini boshlash uchun til tanlash qismini ko'rsatamiz
+            temp_data[user_id] = {"state": "awaiting_language"}
+            keyboard = get_language_inline_keyboard()
+            text = "Sizning akkauntingizdagi ma'lumotlar eskirgan. Iltimos, qayta ro'yhatdan o'ting" if temp_data[user_id]["language"] == "uz" else "Информация в вашем аккаунте устарела. Пожалуйста, зарегистрируйтесь еще раз."
+            await message.answer("Sizning sessiyangiz tugagan. Iltimos, tilni tanlang:\nВыберите язык:", reply_markup=keyboard)
+            # Bu yerda return qilmasak, quyidagi kodlar ham qayta ro'yxatdan o'tishga o'tilmaydi
+            return
+        else:
+            # Agar session yaroqli bo'lsa, odatiy xush kelibsiz xabarini yuboramiz
+            user_language = get_user_language(user_id)
+            text = i18n.get_text("welcome_back", user_language)
+            await message.answer(text)
+            await help_command(message)
+            return
     else:
-        # Yangi foydalanuvchilar uchun til tanlash
+        # Agar foydalanuvchi ro'yxatda bo'lmasa, til tanlash orqali ro'yxatdan o'tishni boshlaymiz
         temp_data[user_id] = {"state": "awaiting_language"}
         keyboard = get_language_inline_keyboard()
         await message.answer("Tilni tanlang:\nВыберите язык:", reply_markup=keyboard)
+
+
+
+
+# @dp.message_handler(commands=['start'])
+# async def start_command(message: types.Message):
+#     user_id = message.from_user.id
+
+#     # Sessiyani tekshirish
+#     if not await check_user_session_valid(user_id):
+#         await message.answer("Sizning sessiyangiz tugagan yoki bloklangansiz. Qayta ro‘yxatdan o‘ting.")
+#         return
+
+#     # Agar foydalanuvchi qidiruv jarayonida bo'lsa, tozalash
+#     searching_users.pop(user_id, None)
+#     temp_data.pop(user_id, None)
+
+#     with get_db_connection() as db:
+#         cursor = db.cursor()
+#         cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+#         user = cursor.fetchone()
+
+
+#     if user and user[2]:  # Agar foydalanuvchi bazada bo'lsa
+#         user_language = get_user_language(user_id)
+#         text = i18n.get_text("welcome_back", user_language)
+#         await message.answer(text)
+#         await help_command(message)
+#     else:
+#         # Yangi foydalanuvchilar uchun til tanlash
+#         temp_data[user_id] = {"state": "awaiting_language"}
+#         keyboard = get_language_inline_keyboard()
+#         await message.answer("Tilni tanlang:\nВыберите язык:", reply_markup=keyboard)
 #END: /start
 
 #=================================search======================================#
@@ -850,10 +903,11 @@ async def cancel_search(message: types.Message):
         await message.reply(text)
 #END: /cancel
 # =============================================================================#
-
-
-# Avtomatik xabar yuborish
 async def send_periodic_message(client, user_id):
+    """
+    Bu funksiya ma'lumotlar bazasidagi postlarni muntazam ravishda barcha guruhlarga yuborishga urunadi 
+    va progress xabarlarni foydalanuvchi bilan bot o'rtasidagi chatga yuboradi.
+    """
     while True:
         cursor.execute("SELECT id, message_id, chat_id FROM posts WHERE user_id = ?", (user_id,))
         posts = cursor.fetchall()
@@ -862,21 +916,32 @@ async def send_periodic_message(client, user_id):
             dialogs = await client.get_dialogs()
             groups = [dialog for dialog in dialogs if dialog.is_group]
             if groups:
-                user_language = get_user_language(message.from_user.id)  
+                user_language = get_user_language(user_id)
+                # Boshlanish xabari bot orqali yuboriladi
                 text = i18n.get_text("started_sending", user_language)
-                progress_message = await client.send_message('me', text)
+                progress_message = await bot.send_message(user_id, text)
                 for idx, group in enumerate(groups, start=1):
                     try:
-                        message = await client.get_messages(chat_id, ids=message_id)
-                        await client.send_message(group.id, message_id, chat_id)
+                        # Xabarni olish: asl nusxani olish yoki forward qilish mumkin.
+                        message_obj = await client.get_messages(chat_id, ids=message_id)
+                        # Forward qilish misoli:
+                        await client.forward_messages(group.id, message_obj, from_peer=chat_id)
+                        
+                        # progress_text = i18n.get_text(
+                        #     "sending_status",
+                        #     user_language,
+                        #     idx=idx,
+                        #     total_groups=len(groups),
+                        #     group_title=group.title
+                        # )
 
-                        progress_text = i18n.get_text(
-                            "sending_progress",
-                            user_language,
+                        progress_text = i18n.get_text("message_sent", user_language).format(
                             idx=idx,
                             total_groups=len(groups),
                             group_title=group.title
                         )
+
+                        # Bot orqali progress xabari yangilanadi
                         await bot.edit_message_text(
                             progress_text, 
                             chat_id=user_id, 
@@ -884,24 +949,20 @@ async def send_periodic_message(client, user_id):
                         )
                         await asyncio.sleep(send_delay)
                     except FloodWaitError as e:
-                        flood_text = i18n.get_text("flood_wait", user_language, seconds=e.seconds)
+                        flood_text = i18n.get_text("flood_wait", user_language).format(seconds=e.seconds)
                         await bot.send_message(user_id, flood_text)
                         await asyncio.sleep(e.seconds)
                     except Exception as e:
-                        error_text = i18n.get_text(
-                            "sending_error",
-                            user_language,
-                            group_title=group.title,
-                            error_detail=str(e)
-                        )
-                user_language = get_user_language(message.from_user.id)  
+                        error_text = i18n.get_text("sending_error", user_language).format(group_title=group.title)
+                        await bot.send_message(user_id, error_text)
+                user_language = get_user_language(user_id)
                 text = i18n.get_text("all_sent", user_language)
                 await bot.edit_message_text(
                     text, 
                     chat_id=user_id, 
                     message_id=progress_message.message_id
                 )
-        await asyncio.sleep(2400)  # 50 daqiqa = 3000 soniya
+        await asyncio.sleep(2400)  # 50 daqiqa kutish
 
 
 async def start_telethon_client(user_id, session_string):
