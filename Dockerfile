@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     rm -rf /var/lib/apt/lists/*
 
 # Ilova katalogiga o'tish
-WORKDIR /userbot_for_logistic
+WORKDIR /app
 
 # Faqat requirements.txt faylini ko'chirish
 COPY requirements.txt .
