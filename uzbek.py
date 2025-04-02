@@ -134,28 +134,41 @@ async def cmd_language(message: types.Message):
 async def process_language_choice(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     selected_lang = callback_query.data.split(":", 1)[1]
-    temp_data[user_id] = {"state": "awaiting_phone", "language": selected_lang}
 
+    # DB'dan foydalanuvchini tekshiramiz
     with get_db_connection() as db:
         cursor = db.cursor()
-        cursor.execute(
-            "INSERT INTO users (user_id, language) VALUES (?, ?) "
-            "ON CONFLICT(user_id) DO UPDATE SET language = ?",
-            (user_id, selected_lang, selected_lang)
-        )
-        db.commit()
+        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+        user = cursor.fetchone()
 
-    # Inline keyboard tugmalarini o‘chirish
+    if user:
+        # Foydalanuvchi allaqachon ro'yxatdan o'tgan bo'lsa, faqat tilni yangilaymiz
+        with get_db_connection() as db:
+            cursor = db.cursor()
+            cursor.execute("UPDATE users SET language = ? WHERE user_id = ?", (selected_lang, user_id))
+            db.commit()
+        text = i18n.get_text("language_changed", selected_lang)
+        await bot.send_message(user_id, text)
+        # Agar temp_data'da foydalanuvchi bo'lsa, til qiymatini yangilaymiz
+        if user_id in temp_data:
+            temp_data[user_id]["language"] = selected_lang
+    else:
+        # Yangi foydalanuvchi uchun ro'yxatdan o'tish jarayoniga kiramiz
+        temp_data[user_id] = {"state": "awaiting_phone", "language": selected_lang}
+        with get_db_connection() as db:
+            cursor = db.cursor()
+            cursor.execute(
+                "INSERT INTO users (user_id, language) VALUES (?, ?) "
+                "ON CONFLICT(user_id) DO UPDATE SET language = ?",
+                (user_id, selected_lang, selected_lang)
+            )
+            db.commit()
+        phone_keyboard = get_phone_button(selected_lang)
+        text = i18n.get_text("ask_phone", selected_lang)
+        await bot.send_message(user_id, text, reply_markup=phone_keyboard)
+
+    # Inline tugmalarini o'chirish
     await bot.delete_message(chat_id=user_id, message_id=callback_query.message.message_id)
-    
-    text = i18n.get_text("language_changed", selected_lang)
-
-
-    # Telefon raqamini so'rash
-    phone_keyboard = get_phone_button(selected_lang)
-    text = i18n.get_text("ask_phone", selected_lang)
-    await bot.send_message(user_id, text, reply_markup=phone_keyboard)
-
 #==========================================================================================#
 
 
@@ -260,34 +273,64 @@ def get_user_name(user_id):
     return "Foydalanuvchi"
 # END: get_user_name
 
-async def delete_user_account(user_id, message=None):
+
+# async def delete_user_account(user_id, message=None):
+#     # Ma’lumotlar bazasidan o'chirish
+#     cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+#     db.commit()
+
+#     # Faol Telethon klientini topamiz va chiqamiz
+#     client = active_clients.get(user_id)
+#     if client:
+#         try:
+#             await client.log_out()      # Telegram akkauntidan chiqish
+#             logging.info("User logged out successfully.")
+#             await client.disconnect()   # Klientni to'liq uzish
+#             logging.info("Client disconnected successfully.")
+#         except Exception as e:
+#             logging.error(f"Foydalanuvchini chiqish paytida xatolik: {e}")
+#         finally:
+#             active_clients.pop(user_id, None)
+
+#     # Qidiruv ro'yxatidan va vaqtinchalik ma'lumotlardan tozalaymiz
+#     searching_users.pop(user_id, None)
+#     temp_data.pop(user_id, None)
+
+#     if message:
+#         user_language = get_user_language(user_id)
+#         text = i18n.get_text("deleted_successfully", user_language)
+#         await message.reply(text, reply_markup=types.ReplyKeyboardRemove())
+
+
+# async def delete_user_account(user_id, message=None):
    
-    # Ma’lumotlar bazasidan o'chirish
-    cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
-    db.commit()
+#     # Ma’lumotlar bazasidan o'chirish
+#     cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+#     db.commit()
 
-    # Faol Telethon klientini topamiz va chiqamiz
-    client = active_clients.get(user_id)
-    if client:
-        try:
-            await client.log_out()      # Telegram akkauntidan chiqish
-            await client.disconnect()   # Klientni to'liq uzish
-        except Exception as e:
-            print(f"Foydalanuvchini chiqish paytida xatolik: {e}")
-        finally:
-            active_clients.pop(user_id, None)
+#     # Faol Telethon klientini topamiz va chiqamiz
+#     client = active_clients.get(user_id)
+#     if client:
+#         try:
+#             await client.log_out()      # Telegram akkauntidan chiqish
+#             await client.disconnect()   # Klientni to'liq uzish
+#         except Exception as e:
+#             print(f"Foydalanuvchini chiqish paytida xatolik: {e}")
+#         finally:
+#             active_clients.pop(user_id, None)
 
 
-    # Qidiruv ro'yxatidan va vaqtinchalik ma'lumotlardan tozalaymiz
-    searching_users.pop(user_id, None)  # Agar user_id mavjud bo‘lsa, olib tashlaydi, bo‘lmasa hech narsa qilmaydi
+#     # Qidiruv ro'yxatidan va vaqtinchalik ma'lumotlardan tozalaymiz
+#     searching_users.pop(user_id, None)  # Agar user_id mavjud bo‘lsa, olib tashlaydi, bo‘lmasa hech narsa qilmaydi
 
-    temp_data.pop(user_id, None)
+#     temp_data.pop(user_id, None)
 
-    if message:
-        user_language = get_user_language(message.from_user.id)  
-        # text = i18n.get_text("deleted_successfully", user_language)
-        text = "Hisobingiz o‘chirildi. Bot xizmatlarini qayta ishlatish uchun /start bosing." if temp_data[user_id]["language"] == "uz" else "Ваш аккаунт удален. Чтобы снова использовать сервисы бота, нажмите /start."
-        await message.reply(text, reply_markup=types.ReplyKeyboardRemove())
+#     if message:
+#         user_language = get_user_language(user_id)
+#         # user_language = get_user_language(message.from_user.id)  
+#         text = i18n.get_text("deleted_successfully", user_language)
+#         # text = "Hisobingiz o‘chirildi. Bot xizmatlarini qayta ishlatish uchun /start bosing." if temp_data[user_id]["language"] == "uz" else "Ваш аккаунт удален. Чтобы снова использовать сервисы бота, нажмите /start."
+#         await message.reply(text, reply_markup=types.ReplyKeyboardRemove())
 # END: delete_user_account
 
 
@@ -657,35 +700,83 @@ async def admin_command(message: types.Message):
     await message.answer(admin_text)
 #END: /admin
 
+
 @dp.message_handler(commands=['stop'])
 async def stop_account(message: types.Message):
     user_id = message.from_user.id
+    user_language = get_user_language(user_id)
 
-    # Agar foydalanuvchi qidiruv jarayonida bo'lsa, uni belgilaymiz
+    # Agar foydalanuvchi qidiruv jarayonida bo'lsa, uni tozalaymiz
     if user_id in searching_users:
-        user_language = get_user_language(message.from_user.id)  
         text = i18n.get_text("in_searching_process", user_language)
         sent_message = await message.reply(text)
-        temp_data[user_id]["stop_after_search"] = True  # Qidiruv tugaganidan keyin hisobni o'chirish
-        temp_data[user_id]["delete_message_id"] = sent_message.message_id  # Xabar ID sini saqlaymiz
+        if user_id in temp_data:
+            temp_data[user_id]["stop_after_search"] = True
+            temp_data[user_id]["delete_message_id"] = sent_message.message_id
         return
-    
-    await delete_user_account(user_id, message)
 
-    # await message.answer(text)
+    # Telethon klientini log out va disconnect qilamiz
+    client = active_clients.get(user_id)
+    if client:
+        try:
+            await client.log_out()         # Telegram akkauntidan chiqish
+            await client.disconnect()      # Klientni to'liq uzish
+            logging.info(f"User {user_id} logged out and disconnected successfully.")
+        except Exception as e:
+            logging.error(f"Error logging out/disconnecting user {user_id}: {e}")
+        finally:
+            active_clients.pop(user_id, None)
 
-async def finish_search_for_user(user_id):
-    # """ Qidiruv tugaganda, agar foydalanuvchi stop bergan bo‘lsa, hisobni o‘chiradi """
-    searching_users.discard(user_id)
+    # Foydalanuvchini ma'lumotlar bazasidan olib tashlaymiz
+    try:
+        with get_db_connection() as db:
+            cursor = db.cursor()
+            cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+            db.commit()
+            logging.info(f"User {user_id} deleted from DB successfully.")
+    except Exception as e:
+        logging.error(f"Error deleting user {user_id} from DB: {e}")
+
+    # Vaqtinchalik ma'lumotlarni tozalaymiz
+    temp_data.pop(user_id, None)
+    searching_users.pop(user_id, None)
+
+    # Yakuniy xabar yuboramiz
+    text = i18n.get_text("deleted_successfully", user_language)
+    await message.reply(text, reply_markup=types.ReplyKeyboardRemove())
+
+
+
+
+# @dp.message_handler(commands=['stop'])
+# async def stop_account(message: types.Message):
+#     user_id = message.from_user.id
+
+#     # Agar foydalanuvchi qidiruv jarayonida bo'lsa, uni belgilaymiz
+#     if user_id in searching_users:
+#         user_language = get_user_language(message.from_user.id)  
+#         text = i18n.get_text("in_searching_process", user_language)
+#         sent_message = await message.reply(text)
+#         temp_data[user_id]["stop_after_search"] = True  # Qidiruv tugaganidan keyin hisobni o'chirish
+#         temp_data[user_id]["delete_message_id"] = sent_message.message_id  # Xabar ID sini saqlaymiz
+#         return
     
-    if temp_data.get(user_id, {}).get("stop_after_search"):
-        # Avval xabarni o‘chirib tashlaymiz
-        message_id = temp_data[user_id].get("delete_message_id")
-        if message_id:
-            try:
-                await bot.delete_message(user_id, message_id)  # Xabarni o‘chiramiz
-            except Exception as e:
-                print(f"Xabarni o‘chirishda xatolik: {e}")
+#     await delete_user_account(user_id, message)
+
+#     # await message.answer(text)
+
+# async def finish_search_for_user(user_id):
+#     # """ Qidiruv tugaganda, agar foydalanuvchi stop bergan bo‘lsa, hisobni o‘chiradi """
+#     searching_users.discard(user_id)
+    
+#     if temp_data.get(user_id, {}).get("stop_after_search"):
+#         # Avval xabarni o‘chirib tashlaymiz
+#         message_id = temp_data[user_id].get("delete_message_id")
+#         if message_id:
+#             try:
+#                 await bot.delete_message(user_id, message_id)  # Xabarni o‘chiramiz
+#             except Exception as e:
+#                 print(f"Xabarni o‘chirishda xatolik: {e}")
 
 #END: /stop
 
@@ -693,73 +784,36 @@ async def finish_search_for_user(user_id):
 async def start_command(message: types.Message):
     user_id = message.from_user.id
 
-    # Avval DB dan foydalanuvchi ma'lumotlarini olamiz
+    # DB'dan foydalanuvchi ma'lumotlarini olamiz
     with get_db_connection() as db:
         cursor = db.cursor()
         cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
         user = cursor.fetchone()
 
-    # Agar foydalanuvchi ro'yxatda bo'lsa va session mavjud bo'lsa
     if user:
-        # Agar session yaroqsiz bo'lsa
-        if not await check_user_session_valid(user_id):
-            # Yaroqsiz sessiyani yangilaymiz yoki o'chirib qo'yamiz
-            with get_db_connection() as db:
-                cursor = db.cursor()
-                cursor.execute("UPDATE users SET session_string = NULL WHERE user_id = ?", (user_id,))
-                db.commit()
-            # Ro'yxatdan o'tish jarayonini boshlash uchun til tanlash qismini ko'rsatamiz
-            temp_data[user_id] = {"state": "awaiting_language"}
-            keyboard = get_language_inline_keyboard()
-            text = "Sizning akkauntingizdagi ma'lumotlar eskirgan. Iltimos, qayta ro'yhatdan o'ting" if temp_data[user_id]["language"] == "uz" else "Информация в вашем аккаунте устарела. Пожалуйста, зарегистрируйтесь еще раз."
-            await message.answer("Sizning sessiyangiz tugagan. Iltimos, tilni tanlang:\nВыберите язык:", reply_markup=keyboard)
-            # Bu yerda return qilmasak, quyidagi kodlar ham qayta ro'yxatdan o'tishga o'tilmaydi
-            return
-        else:
-            # Agar session yaroqli bo'lsa, odatiy xush kelibsiz xabarini yuboramiz
+        # Foydalanuvchi ro'yxatda bo'lganida
+        if await check_user_session_valid(user_id):
+            # Sessiya yaroqli – xush kelibsiz xabarini yuboramiz
             user_language = get_user_language(user_id)
             text = i18n.get_text("welcome_back", user_language)
             await message.answer(text)
             await help_command(message)
-            return
+        else:
+            # Foydalanuvchi botdan chiqarib yuborgan bo'lsa – ro'yxatdan o'tishga yo'naltiramiz
+            user_language = get_user_language(user_id)
+            text = i18n.get_text("session_invalid", user_language)  # Masalan: "Sizning sessiyangiz tugagan. Iltimos, qayta ro'yhatdan o'ting."
+            await message.answer(text)
+            # Bu yerda til tanlash qismi so'ralmasligi uchun, DBdagi til asosida telefon raqamini so'rash bosqichiga o'ting
+            phone_keyboard = get_phone_button(user_language)
+            ask_phone_text = i18n.get_text("ask_phone", user_language)
+            await message.answer(ask_phone_text, reply_markup=phone_keyboard)
     else:
-        # Agar foydalanuvchi ro'yxatda bo'lmasa, til tanlash orqali ro'yxatdan o'tishni boshlaymiz
+        # Yangi foydalanuvchi: til tanlashni so'raymiz
         temp_data[user_id] = {"state": "awaiting_language"}
         keyboard = get_language_inline_keyboard()
         await message.answer("Tilni tanlang:\nВыберите язык:", reply_markup=keyboard)
 
 
-
-
-# @dp.message_handler(commands=['start'])
-# async def start_command(message: types.Message):
-#     user_id = message.from_user.id
-
-#     # Sessiyani tekshirish
-#     if not await check_user_session_valid(user_id):
-#         await message.answer("Sizning sessiyangiz tugagan yoki bloklangansiz. Qayta ro‘yxatdan o‘ting.")
-#         return
-
-#     # Agar foydalanuvchi qidiruv jarayonida bo'lsa, tozalash
-#     searching_users.pop(user_id, None)
-#     temp_data.pop(user_id, None)
-
-#     with get_db_connection() as db:
-#         cursor = db.cursor()
-#         cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-#         user = cursor.fetchone()
-
-
-#     if user and user[2]:  # Agar foydalanuvchi bazada bo'lsa
-#         user_language = get_user_language(user_id)
-#         text = i18n.get_text("welcome_back", user_language)
-#         await message.answer(text)
-#         await help_command(message)
-#     else:
-#         # Yangi foydalanuvchilar uchun til tanlash
-#         temp_data[user_id] = {"state": "awaiting_language"}
-#         keyboard = get_language_inline_keyboard()
-#         await message.answer("Tilni tanlang:\nВыберите язык:", reply_markup=keyboard)
 #END: /start
 
 #=================================search======================================#
